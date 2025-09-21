@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PennDrive</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .page-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: flex-start;
+            height: 100vh;
+            width: 100%;
+        }
+        .page-header {
+            width: 100%;
+            background-color: #061f53;
+            color: #f4f4f4;
+        }
+        .page-body {
+            width: 100%;
+        }
+        .current-dir {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            column-gap: 20px;
+        }
+
+        .current-dir-name {
+            font-style: italic;
+            color: red
+        }
+
+        .current-dir-buttons{
+            display: flex;
+            margin-left: auto;
+            margin-right: 20px;
+        }
+
+        .dir-item {
+            width: 95%;
+            height: 30px;
+            display: flex;
+            flex-direction:row;
+            justify-content: space-between;
+            background-color: #b2c8f5;
+            font-size: 20px;
+            padding: 5px;
+            border-radius: 5px;
+        }
+
+
+        .file-item {
+            width: 95%;
+            height: 30px;
+            display: flex;
+            flex-direction:row;
+            justify-content: space-between;
+            background-color: #f1f5b2;
+            font-size: 20px;
+            padding: 5px;
+            border-radius: 5px;
+            margin-bottom: 2px;
+        }
+
+        .upload-dir-overlay, .move-file-overlay, .move-dir-overlay, .upload-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
+            z-index: 2; /* Ensure it appears above other elements */
+        }
+
+        .move-file-form-popup, .move-dir-form-popup, .upload-form-popup, .upload-dir-form-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 3; /* Ensure it appears above the overlay */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <div class="page-header">
+            <h1>Welcome to PennDrive</h1>
+        </div>
+        
+        <div class="page-body">
+            <div class="current-dir">
+                <h1>Current Directory:</h1>
+                <h1 class="current-dir-name" id="current-dir-name">
+                    Loading
+                </h1>
+                <div class="current-dir-buttons">
+                    <button id="back-btn" onclick="goBack()"> Back </button>
+                    <button id="new-file-btn"> New File</button>
+                    <button id="new-dir-btn"> New Directory</button>
+                </div>
+                
+            </div>
+
+            <div class="dir-list-container">
+                <ul class="dir-list" id="dir-list">
+                </ul>
+            </div>
+
+            <div class="file-list-container">
+                <ul class="file-list" id="file-list">
+                </ul>
+            </div>
+
+        </div>
+        
+        
+        <!-- Upload form and overlay -->
+        <div class="upload-overlay" id="upload-overlay"></div>
+        <div class="upload-form-popup" id="upload-form-popup">
+            <h2>Please select your file</h2>
+            <form id="file-upload-form" enctype="multipart/form-data">
+                <input type="file" name="file" id="file">
+                <button type="submit" id="upload-btn">Upload</button>
+                <button type="button" onclick="closeUploadForm()">Cancel</button>
+            </form>
+        </div>
+
+        <!-- New directory -->
+        <div class="upload-dir-overlay" id="upload-dir-overlay"></div>
+        <div class="upload-dir-form-popup" id="upload-dir-form-popup">
+            <h2>Please input your new directory name</h2>
+            <form id="upload-dir-form">
+                <input type="text" id="upload-dir-name" placeholder="Enter new directory name">
+                <button type="submit" id="create-dir-btn">Create</button>
+                <button type="button" onclick="closeUploadDirForm()">Cancel</button>
+            </form>
+        </div>
+
+        <!-- Move directory -->
+        <div class="move-dir-overlay" id="move-dir-overlay"></div>
+        <div class="move-dir-form-popup" id="move-dir-form-popup">
+            <h2>Move Directory</h2>
+            <form id="move-dir-form">
+                Old Name:<input type="text" id="old-dir-name" readonly>
+                New Name:<input type="text" id="new-dir-name" placeholder="Enter new directory name">
+                <button type="submit" id="move-dir-btn">Move</button>
+                <button type="button" onclick="closeMoveDirForm()">Cancel</button>
+            </form>
+        </div>
+
+        <!-- Move file -->
+        <div class="move-file-overlay" id="move-file-overlay"></div>
+        <div class="move-file-form-popup" id="move-file-form-popup">
+            <h2>Move File</h2>
+            <form id="move-file-form">
+                Old Name:<input type="text" id="old-file-name" readonly>
+                New Name:<input type="text" id="new-file-name" placeholder="Enter new file name">
+                <button type="submit" id="move-file-btn">Move</button>
+                <button type="button" onclick="closeMoveFileForm()">Cancel</button>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        var trueFilePaths = [];
+        const queryString = window.location.search;
+        const queryStringList = window.location.search.split('&');
+        const userName = queryStringList[0].substring(6);
+        const targetDirectory= queryStringList[1].substring(4);
+        const lastSlashIndex = targetDirectory.lastIndexOf('/');
+        const secondToLastSlash =  targetDirectory.substring(0, lastSlashIndex).lastIndexOf('/');
+        const parentDirectory = targetDirectory.substring(0, secondToLastSlash+1);
+        // Get references to the upload form and overlay
+        // NEW file
+        const uploadOverlay = document.getElementById('upload-overlay');
+        const uploadFormPopup = document.getElementById('upload-form-popup');
+        // NEW Directory
+        const uploadDirOverlay = document.getElementById('upload-dir-overlay');
+        const uploadDirFormPopup = document.getElementById('upload-dir-form-popup');
+        // MOVE/CHANGE dir
+        const moveDirOverlay = document.getElementById('move-dir-overlay');
+        const moveDirFormPopup = document.getElementById('move-dir-form-popup');
+        // MOVE/CHANGE file
+        const moveFileOverlay = document.getElementById('move-file-overlay');
+        const moveFileFormPopup = document.getElementById('move-file-form-popup');
+        function goBack() {
+            if(parentDirectory == "") return;
+            window.location.href = `/penndrive?user=${userName}&dir=${parentDirectory}`;
+        }
+        // Function to show the upload form and overlay
+        function showUploadForm() {
+            uploadOverlay.style.display = 'block';
+            uploadFormPopup.style.display = 'block';
+        }
+
+        // Function to close the upload form and overlay
+        function closeUploadForm() {
+            uploadOverlay.style.display = 'none';
+            uploadFormPopup.style.display = 'none';
+        }
+
+        // Function to show the upload form and overlay
+        function showUploadDirForm() {
+            uploadDirOverlay.style.display = 'block';
+            uploadDirFormPopup.style.display = 'block';
+        }
+
+        // Function to close the upload form and overlay
+        function closeUploadDirForm() {
+            uploadDirOverlay.style.display = 'none';
+            uploadDirFormPopup.style.display = 'none';
+        }
+
+        function showMoveDirForm() {
+            moveDirOverlay.style.display = 'block';
+            moveDirFormPopup.style.display = 'block';
+        }
+
+        // Function to close the upload form and overlay
+        function closeMoveDirForm() {
+            moveDirOverlay.style.display = 'none';
+            moveDirFormPopup.style.display = 'none';
+        }
+
+        function showMoveFileForm() {
+            moveFileOverlay.style.display = 'block';
+            moveFileFormPopup.style.display = 'block';
+        }
+
+        // Function to close the upload form and overlay
+        function closeMoveFileForm() {
+            moveFileOverlay.style.display = 'none';
+            moveFileFormPopup.style.display = 'none';
+        }
+
+        // Function to download a file
+        function downloadFile(file) {
+            // Create a link and set the URL using `createObjectURL`
+            const link = document.createElement("a");
+            link.style.display = "none";
+            link.href = URL.createObjectURL(file);
+            link.download = file.name;
+
+            // It needs to be added to the DOM so it can be clicked
+            document.body.appendChild(link);
+            link.click();
+
+            // To make this work on Firefox we need to wait
+            // a little while before removing it.
+            setTimeout(() => {
+                URL.revokeObjectURL(link.href);
+                link.parentNode.removeChild(link);
+            }, 0);
+        }
+
+        function getMimeType(fileName) {
+            // Get the file extension
+            var extension = fileName.split('.').pop().toLowerCase();
+
+            // Define MIME types based on file extension
+            var mimeTypes = {
+                'txt': 'text/plain',
+                'html': 'text/html',
+                'css': 'text/css',
+                'js': 'application/javascript',
+                'json': 'application/json',
+                'xml': 'application/xml',
+                'pdf': 'application/pdf',
+                'doc': 'application/msword',
+                'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'xls': 'application/vnd.ms-excel',
+                'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'ppt': 'application/vnd.ms-powerpoint',
+                'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'zip': 'application/zip',
+                'gif': 'image/gif',
+                'jpeg': 'image/jpeg',
+                'jpg': 'image/jpeg',
+                'png': 'image/png',
+                'svg': 'image/svg+xml',
+                'bmp': 'image/bmp',
+                'tif': 'image/tiff',
+                'tiff': 'image/tiff'
+                // Add more mappings as needed
+            };
+
+            // Look up the MIME type based on the file extension
+            var mimeType = mimeTypes[extension];
+
+            // If MIME type is not found, return a default value
+            if (!mimeType) {
+                mimeType = 'application/octet-stream'; // Default MIME type for unknown files
+            }
+
+            return mimeType;
+        }
+
+        // Event listener for the "New File" button click
+        document.getElementById('new-file-btn').addEventListener('click', showUploadForm);
+        
+        // new-dir-btn
+        document.getElementById('new-dir-btn').addEventListener('click', showUploadDirForm);
+        
+        // Event listern for "Create" new DIRECTORY button click
+        document.getElementById("create-dir-btn").addEventListener("click", function(event) {
+            event.preventDefault();
+            const newDirName = targetDirectory+document.getElementById("upload-dir-name").value+'/';
+            console.log(`newDirName: ${newDirName}`);
+            fetch(`/send?user=${userName}&type=file&filename=${newDirName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain',
+                },
+                body: '',
+            })
+            .then(response => {
+                alert('Create new directory status: ' + response.status);
+                closeUploadDirForm();
+                if(response.status == 201){
+                    window.location.href = window.location.href;
+                }
+            })
+
+            document.getElementById("upload-dir-name").value = "";
+            closeUploadDirForm();
+        })
+
+        // Event listern for "Change/Move" FILE
+        document.getElementById("move-file-btn").addEventListener("click", function(event){
+            event.preventDefault();
+            const oldFileName = document.getElementById("old-file-name").value;
+            const newFileName = document.getElementById("new-file-name").value;
+            // PUT /move?user=&old=&new= 
+            fetch(`/move?user=${userName}&old=${oldFileName}&new=${newFileName}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'text/plain',
+                },
+                body: '',
+            })
+            .then(response => {
+                alert('Move file status: ' + response.status);
+                if(response.status == 200){
+                    window.location.href = window.location.href;
+                }
+            });
+        
+        })
+
+        // Event listener for "Change/Move" Directory
+        document.getElementById("move-dir-btn").addEventListener("click", function(event){
+            event.preventDefault();
+            const oldDirName = document.getElementById("old-dir-name").value;
+            const newDirName = document.getElementById("new-dir-name").value;
+            const filesUnderMovedDir = trueFilePaths.filter(path => path.startsWith(oldDirName));
+            console.log(`oldDirName: ${oldDirName}`);
+            console.log(`filesUnderMovedDir BEFORE MOVE: ${filesUnderMovedDir}`);
+            const modifiedFilePaths = filesUnderMovedDir.map(filePath => {
+                return newDirName + filePath.substring(oldDirName.length);
+            });
+            console.log(`filesUnderMovedDir AFTER MOVE: ${modifiedFilePaths}`);
+            const movePromises = [];
+            for (let i in modifiedFilePaths) {
+                    console.log(`Moving subfile: ${modifiedFilePaths[i]}`);
+                    const movePromise = fetch(`/move?user=${userName}&old=${filesUnderMovedDir[i]}&new=${modifiedFilePaths[i]}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'text/plain',
+                        },
+                        body: '',
+                    })
+                    .then(response => {
+                        console.log(`Moved subfile status: ${response.status}`);
+                    });
+
+                    movePromises.push(movePromise);
+                }
+
+                Promise.all(movePromises)
+                    .then(() => {
+                        // Reset window location after all fetch requests are done
+                        window.location.href = window.location.href;
+                    });
+        });
+
+        // Event listener for "Upload" new FILE button click
+        document.getElementById("upload-btn").addEventListener("click", function(event){
+            event.preventDefault();
+            var fileInput = document.getElementById("file");
+            if(fileInput.files.length > 0){
+                var file = fileInput.files[0];
+                var filename = file.name;
+                console.log(filename);
+                var reader = new FileReader();
+                reader.readAsArrayBuffer(file);
+                reader.onload = function(event) {
+                    var fileContent = event.target.result;
+                    var type = getMimeType(filename);
+                    alert(`POST to: /send?user=${userName}&type=file&filename=${targetDirectory}${filename}`)
+                    alert('Reader returned type: '+typeof fileContent+'\nFile name: ' + filename + '\nFile MIME type: ' + type + '\nFile Length: ' + fileContent.length + '\nFile Content: ' + fileContent);
+                    var base64String = btoa(String.fromCharCode.apply(null, new Uint8Array(fileContent)));
+                    alert('base64 Encoded File Length: ' + base64String.length + '\nbase64 Encoded Content: ' + base64String);
+                    
+                    fetch(`/send?user=${userName}&type=file&filename=${targetDirectory}${filename}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': type,
+                        },
+                        body: base64String,
+                    })
+                    .then(response => {
+                        alert('Upload status: ' + response.status);
+                        closeUploadForm();
+
+                        if(response.status === 201) {
+                            // TODO need test
+                            //addFileListItem(targetDirectory, filename);
+                            window.location.href = window.location.href;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error uploading user file:', error);
+                    })
+                }
+
+            }
+        });
+
+        function addFileListItem(targetDirectory, filename){
+            // add list item for newly uploaded file
+            const fileList = document.getElementById("file-list");
+            const fileListItem = document.createElement("li"); 
+            const fileItemDiv = document.createElement('div');
+            fileItemDiv.className = 'file-item';
+            const fileNameDiv = document.createElement('div');
+            fileNameDiv.className = 'file-item-name';
+            fileNameDiv.id = 'file-item-name ' + filename;
+            fileNameDiv.textContent = filename;
+            const buttonsDiv = document.createElement('div');
+            buttonsDiv.className = 'dir-item-buttons';
+            const downloadButton = document.createElement('button');
+            downloadButton.textContent = 'Download';
+            downloadButton.id = `/retrieve?user=${userName}&type=${targetDirectory}${filename}`;
+            buttonsDiv.appendChild(downloadButton);
+            // register event handler for new download button
+            downloadButton.addEventListener("click", (e) => {
+                e.preventDefault();
+                alert(`Fetching from url: ${downloadButton.id}`);
+                fetch(downloadButton.id)
+                .then(response => {
+                    alert('Download status: ' + response.status);
+                    if(response.status === 200){
+                        return response.text().then(text => ({ status: response.status, text: text }));
+                    }
+                })
+                .then(data => {
+                    const dataType64toFile = (base64Data, filename) => {
+                        //Convert base64 to file
+                        var mime = getMimeType(filename);
+                        alert(mime);
+                        let bstr = atob(base64Data);
+                        let n = bstr.length;
+                        let u8arr = new Uint8Array(n);
+                        alert(n);
+                        while (n--) {
+                            u8arr[n] = bstr.charCodeAt(n)
+                        }
+                        let newFile = new File([u8arr], filename, {
+                            type: mime,
+                        });
+                        return newFile;
+                    };
+                    //const myFile = new File([data.text], filename);
+                    const downloadName = downloadButton.id.split('=').pop();
+
+                    alert(`Retrieved\filename:${downloadName}\nfile contnet: ${data.text}`);
+                    const myFile = dataType64toFile(data.text, filename);
+                    downloadFile(myFile);
+                })
+                .catch(errror => {
+                    console.error('Error fetching user file:', error);
+                });
+            });
+            const moveButton = document.createElement('button');
+            moveButton.textContent = 'Move';
+            moveButton.addEventListener('click', (e) => {
+                const oldName = document.getElementById('old-file-name');
+                oldName.value = targetDirectory+filename;
+                showMoveFileForm();
+            });
+            buttonsDiv.appendChild(moveButton);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            deleteButton.id = `/delete?user=${userName}&type=file&filename=${targetDirectory}${filename}`;
+            // TODO
+            deleteButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert(`Deleting from url: ${deleteButton.id}`);
+                fetch(deleteButton.id, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'text/plain',
+                    },
+                    body: '',
+                })
+                .then(response => {
+                    alert('Delete file status: ' + response.status);
+                    if(response.status == 200){
+                        window.location.href = window.location.href;
+                    }
+                });
+            })
+            buttonsDiv.appendChild(deleteButton);
+
+            // Append the <div> elements to the file-item div
+            fileItemDiv.appendChild(fileNameDiv);
+            fileItemDiv.appendChild(buttonsDiv);
+
+            // Append the file-item div to the <li> element
+            fileListItem.appendChild(fileItemDiv);
+
+            // Append the new list item to the list
+            fileList.appendChild(fileListItem);
+            console.log("appened: " + filename);
+        }
+
+        function addDirListItem(targetDirectory, dirname){
+            // add list item for newly uploaded file
+            const dirList = document.getElementById("dir-list");
+            const dirListItem = document.createElement("li"); 
+            const dirItemDiv = document.createElement('div');
+            dirItemDiv.className = 'dir-item';
+            const dirNameDiv = document.createElement('div');
+            dirNameDiv.className = 'dir-item-name';
+            dirNameDiv.id = 'dir-item-name ' + dirname;
+            dirNameDiv.textContent = dirname;
+            const buttonsDiv = document.createElement('div');
+            buttonsDiv.className = 'dir-item-buttons';
+            const enterButton = document.createElement('button');
+            enterButton.textContent = 'Enter';
+            enterButton.id = `/penndrive?user=${userName}&dir=${targetDirectory}${dirname}`;
+            buttonsDiv.appendChild(enterButton);
+            // register event handler for new download button
+            enterButton.addEventListener("click", (e) => {
+                e.preventDefault();
+                alert(`Redirect to url: ${enterButton.id}`);
+                window.location.href = enterButton.id;
+            });
+            const moveButton = document.createElement('button');
+            moveButton.textContent = 'Move';
+            // TODO(!)
+            moveButton.addEventListener('click', (e) => {
+                const oldName = document.getElementById('old-dir-name');
+                oldName.value = targetDirectory+dirname;
+                showMoveDirForm();
+            });
+            buttonsDiv.appendChild(moveButton);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            deleteButton.id = `/delete?user=${userName}&type=file&filename=${targetDirectory}${dirname}`;
+            deleteButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert(`Deleting from url: ${deleteButton.id}`);
+                
+                const prefix = targetDirectory + dirname;
+                const filesUnderDeletedDir = trueFilePaths.filter(path => path.startsWith(prefix));
+                //console.log(`prefix: ${prefix}`);
+                //console.log(`filesUnderDeletedDir: ${filesUnderDeletedDir}`);
+                const deletePromises = [];
+
+                for (let i in filesUnderDeletedDir) {
+                    console.log(`Deleting subfile: ${filesUnderDeletedDir[i]}`);
+                    const deletePromise = fetch(`/delete?user=${userName}&type=file&filename=${filesUnderDeletedDir[i]}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'text/plain',
+                        },
+                        body: '',
+                    })
+                    .then(response => {
+                        console.log(`Delete subfile status: ${response.status}`);
+                    });
+
+                    deletePromises.push(deletePromise);
+                }
+
+                Promise.all(deletePromises)
+                    .then(() => {
+                        // Reset window location after all fetch requests are done
+                        window.location.href = window.location.href;
+                    });
+                
+                
+            })
+            buttonsDiv.appendChild(deleteButton);
+
+            // Append the <div> elements to the file-item div
+            dirItemDiv.appendChild(dirNameDiv);
+            dirItemDiv.appendChild(buttonsDiv);
+
+            // Append the file-item div to the <li> element
+            dirListItem.appendChild(dirItemDiv);
+
+            // Append the new list item to the list
+            dirList.appendChild(dirListItem);
+            console.log("appened: " + dirname);
+        }
+        
+        function parseDirectoriesAndFiles(filePaths, targetDirectory) {
+            const directories = {};
+            //console.log(`parseDirectiries: ${filePaths}`);
+            // Iterate through each file path
+            filePaths.forEach(filePath => {
+                // Split the file path into directory and file name
+                const lastSlashIndex = filePath.lastIndexOf('/');
+                const directory = filePath.substring(0, lastSlashIndex);
+                const file = filePath.substring(lastSlashIndex + 1);
+                // Initialize subdirectories array
+                const subdirectories = directory.split('/');
+                // Iterate through subdirectories to create parent directories
+                let currentDir = '';
+                subdirectories.forEach(subDir => {
+                    currentDir += subDir + '/';
+                    if (currentDir in directories === false) {
+                        directories[currentDir] = [];
+                    }
+                });
+                if(file.length>0) directories[currentDir].push(file);
+            });
+            console.log(`Current Dir: ${targetDirectory}`);
+            document.getElementById("current-dir-name").innerHTML = targetDirectory;
+            if(directories[targetDirectory].length > 0){
+                console.log(`Files in current Dir: ${directories[targetDirectory]}`)
+                for(i in directories[targetDirectory]){
+                    //console.log("filename", directories[targetDirectory][i]);
+                    addFileListItem(targetDirectory, directories[targetDirectory][i]);
+                }
+            }else{
+                console.log(`Files in current Dir: EMPTY`);
+            }
+
+            const subDirs = [];
+            for (const d in directories) {
+                const dirlist = d.split(targetDirectory);
+                if(dirlist.length != 2) continue;
+                const sub = d.split(targetDirectory)[1];
+                const temp = sub.split('/');
+                if(temp.length == 2){
+                    subDirs.push(sub);
+                }
+            }
+            if(subDirs.length > 0){
+                console.log(`Subdir in current Dir: ${subDirs}`);
+                for(i in subDirs){
+                    //console.log("subdirName", subDirs[i]);
+                    addDirListItem(targetDirectory, subDirs[i]);
+                }
+            }else {
+                console.log(`Subdir in current Dir: EMPTY`);
+            }
+        }
+
+        // Example usage:
+        const filePaths = [
+            "./",
+            "./test00.txt",
+            "./penn.png",
+            "./dirA/",
+            "./dirA/image.jpeg",
+            "./dirB/",
+            "./dirB/test2.txt",
+            "./dirB/subdir1/",
+            "./dirB/subdir2/",
+            "./dirB/subdir1/abc.txt",
+            "./dirC/",
+            "./dirC/subdir3/",
+            "./dirC/subdir3/xyz.txt"
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const queryString = window.location.search;
+            const queryStringList = window.location.search.split('&');
+            const userName = queryStringList[0].substring(6);
+            
+            fetch(`/retrieve?user=${userName}&type=dir`)
+                .then(response => {
+                    return response.text();
+                })
+                .then(data => {
+                    //console.log(`Retrieved Col Names: ${data}`);
+                    trueFilePaths = data.split("\n");
+                    //console.log(`splitted result: ${trueFilePaths}`);
+                    parseDirectoriesAndFiles(trueFilePaths, targetDirectory);
+                    //const prefix = "./dirA/";
+
+                    //const elementsWithPrefix = filePaths.filter(path => path.startsWith(prefix));
+
+                    //console.log(elementsWithPrefix);
+                })
+            
+        });
+        
+
+        
+    </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            height: 100vh;
+        }
+
+        .module-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap; 
+        }
+        .module {
+            flex: 1 1 0px;
+            min-width: 250px;
+            min-height: 250px;
+            display: flex;
+            margin: 10px;
+            padding: 10px;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            cursor: pointer;
+            border-radius: 10px;
+            color: white;
+        }
+        /* Define different colors for each module by subclass */
+        .pennmail { background-color: #061f53; }
+        .pennmail:hover { background-color: #5e7cbe; }
+        .penndrive { background-color: #9d1010; }
+        .penndrive:hover { background-color: #e76262; }
+        .admin { background-color: #373236; }
+        .admin:hover { background-color: #80747e; }
+    </style>
+</head>
+<body>
+    <div class="module-container">
+        <div class="module pennmail" onclick="redirectTo('/pennmail');">
+            PennMail
+        </div>
+        <div class="module penndrive" onclick="redirectTo('/penndrive');">
+            PennDrive
+        </div>
+        <div class="module admin" onclick="redirectTo('/admin');">
+            Admin
+        </div>
+    </div>
+    
+
+    <script>
+        const queryString = window.location.search;
+
+        function redirectTo(module) {
+            var path = "";
+            if(module == "/penndrive") path += "&dir=./";
+            window.location.href = module + queryString + path;
+        }
+    </script>
+</body>
+</html>

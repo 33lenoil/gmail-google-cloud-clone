@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PennMail</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .mail-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            height: 100vh;
+            width: 100%;
+        }
+        .mail-container-header {
+            width: 100%;
+            background-color: #061f53;
+            color: #f4f4f4;
+        }
+
+        .mail-container-body {
+            width: 100%;
+            height: 100%;
+            background-color: #e8ecf6;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+        }
+        .sidebar {
+            width: 30%;
+            height: 100%;
+            background-color: #c1cde7;
+            border-right: 1px solid #ddd;
+            padding: 0px 20px 0px 5px;
+        }
+        .inbox {
+            margin-bottom: 20px;
+        }
+        .inbox-title {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            column-gap: 10px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            font-size: 20px;
+            color:#061f53
+        }
+        .inbox-item {
+            height: 50px;
+            width: 100%;
+            margin: 0px 0px 5px 0px;
+            padding: 5px;
+            color: black;
+            cursor: pointer;
+            border: 1px dashed #061f53;
+        }
+
+        .inbox-item:hover {
+            background-color: #d3dbed;
+        }
+        .content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .compose-form {
+            height: 80%;
+            width: 100%;
+            margin: 20px 10px 20px 10px;
+            padding: 30px 10px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .compose-form input[type="text"],
+        .compose-form textarea {
+            width: 97%;
+            padding: 10px 5px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 15px;
+        }
+
+        .compose-form textarea {
+            height: 60%;
+            resize: vertical;
+        }
+
+        .compose-form input[type="submit"],
+        .compose-form button {
+            padding: 10px 20px;
+            background-color: #061f53;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        input[type="submit"].send-btn:hover {
+            background-color: #0056b3;
+        }
+
+        button.cancel-btn {
+            background-color: #9d1010;
+        }
+
+        button.cancel-btn:hover {
+            background-color: #e15151;
+        }
+
+        .inbox-title p {
+            width:100%
+        }
+        .compose-btn {
+            width: 80%;
+            background-color: #6f8bc9;
+            color: black;
+            font-weight: bold;
+            border: none;
+            padding: 10px 10px;
+            border-radius: 5px;
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+        .compose-btn:hover {
+            background-color: #a2b8e0;
+            border: 2px solid white
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="mail-container">
+        <div class="mail-container-header">
+            <h1>Welcome to PennMail</h1>
+        </div>
+        <div class="mail-container-body">
+            <div class="sidebar">
+                <div class="inbox">
+                    <div class="inbox-title">
+                        <p> Inbox </p>
+                        <button class="compose-btn" id="compose-btn">Compose</button>
+                    </div>
+                    <div id="inbox-list">
+
+                    </div>
+
+                </div>
+            </div>
+            <div class="content" id="inbox">
+                <form class="compose-form hidden" id="compose-form">
+                    <input type="text" id="to" name="to" placeholder="Recipients" required><br><br>
+                    <input type="text" id="subject" name="subject" placeholder="Subject" required><br><br>
+                    <textarea id="body" name="body" rows="10" placeholder="Compose email" required></textarea><br><br>
+                    <input type="submit" value="Send" class="send-btn" id="send-btn">
+                    <button type="button" class="cancel-btn" id="cancel-btn">Discard</button>
+                </form>
+                <form class="compose-form hidden" id="display-form">
+                    From <input type="text" id="display-from" name="display-from" placeholder="Sender" required readonly><br><br>
+                    Subject<input type="text" id="display-subject" name="display-subject" placeholder="Subject" required readonly><br><br>
+                    <input type="text" id="display-uid" name="display-uid" hidden>
+                    <textarea id="display-body" name="display-body" rows="10" placeholder="Email Content" required readonly></textarea><br><br>
+                    <button type="button" class="close-btn" id="close-btn">Close</button>
+                    <button type="button" class="delete-btn" id="delete-btn">Delete</button>
+                    <button type="button" class="reply-btn" id="reply-btn">Reply</button>
+                    <button type="button" class="forward-btn" id="forward-btn">Forward</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        function refreshPage(){
+            if(document.getElementById("display-form").classList.contains('hidden') && document.getElementById("compose-form").classList.contains('hidden'))
+                location.reload();
+        }
+
+        setInterval(refreshPage, 5000);
+        const queryString = window.location.search;
+        const username = queryString.substring(6)
+        const from = username + "@localhost";
+        const composeButton = document.getElementById("compose-btn");
+
+        const composeForm = document.getElementById("compose-form");
+        const displayForm = document.getElementById("display-form");
+        composeButton.addEventListener("click", (e) => {
+            composeForm.classList.remove('hidden');
+            if(!displayForm.classList.contains('hidden')) 
+                displayForm.classList.add('hidden');
+        });
+
+        const cancelButton = document.getElementById("cancel-btn");
+        cancelButton.addEventListener("click", (e) => {
+            const confirmed = confirm("Are you sure to discard the draft?");
+            if(confirmed){
+                composeForm.classList.add('hidden');
+                document.getElementById("to").value = "";
+                document.getElementById("to").removeAttribute("readonly");
+                document.getElementById("subject").value = "";
+                document.getElementById("subject").removeAttribute("readonly");
+                document.getElementById("body").value = "";
+                document.getElementById("body").removeAttribute("readonly");
+            }
+        });
+
+        const closeButton = document.getElementById("close-btn");
+        closeButton.addEventListener("click", (e) => {
+            displayForm.classList.add('hidden');
+            document.getElementById("display-from").value = "";
+            document.getElementById("display-subject").value = "";
+            document.getElementById("display-body").value = "";
+        });
+
+        const deleteButton = document.getElementById("delete-btn");
+        deleteButton.addEventListener("click", (e) => {
+            const uid = document.getElementById("display-uid").value;
+            const body = `username=${username}&uid=${uid}`;
+            fetch('/send?type=mail', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'text/plain',
+                },
+                body: body,
+            })
+            .then(response => {
+                alert(response.status);
+                if(response.status == 200){
+                    // reset display form
+                    displayForm.classList.add('hidden');
+                    document.getElementById("display-from").value = "";
+                    document.getElementById("display-subject").value = "";
+                    document.getElementById("display-body").value = "";
+                    // reload page
+                    window.location.href = window.location.href;
+                }
+                
+            })
+            .catch(error => {
+                console.error('Error deleting user email:', error);
+            });
+        })
+
+        const replyButton = document.getElementById("reply-btn");
+        replyButton.addEventListener("click", (e) => {
+            e.preventDefault();
+            const replyTo = document.getElementById("display-from").value;
+            const prevSubject = document.getElementById("display-subject").value;
+            const replySubject = "Re: " + prevSubject;
+            // set reply compose form
+            // Receipient
+            document.getElementById("to").value = replyTo;
+            document.getElementById("to").setAttribute("readonly", true);
+            // Subject
+            document.getElementById("subject").value = replySubject;
+            document.getElementById("subject").setAttribute("readonly", true);
+            
+            if(!displayForm.classList.contains('hidden')) 
+                displayForm.classList.add('hidden');
+            composeForm.classList.remove('hidden');
+        })
+
+        const forwardButton = document.getElementById("forward-btn");
+        forwardButton.addEventListener("click", (e) => {
+            e.preventDefault();
+            const prevSubject = document.getElementById("display-subject").value;
+            const prevBody = document.getElementById("display-body").value;
+            const forwardSubject = "Fwd: " + prevSubject;
+
+            // set reply compose form
+            // Subject
+            document.getElementById("subject").value = forwardSubject;
+            document.getElementById("subject").setAttribute("readonly", true);
+            // Body
+            document.getElementById("body").value = prevBody;
+            document.getElementById("body").setAttribute("readonly", true);
+            
+            if(!displayForm.classList.contains('hidden')) 
+                displayForm.classList.add('hidden');
+            composeForm.classList.remove('hidden');
+        })
+
+        const sendButton = document.getElementById("send-btn");
+        sendButton.addEventListener("click", (e) => {
+            e.preventDefault();
+            // xxx@localhost
+            const to = document.getElementById("to").value;
+            // string
+            const subject = document.getElementById("subject").value;
+            // string
+            const body = document.getElementById("body").value;
+
+            const newMail = `From: <${from}>\nTo: <${to}>\nSubject: ${subject}\n${body}`;
+            fetch('/send?type=mail', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain',
+                },
+                body: newMail,
+            })
+            .then(response => {
+                alert(response.status);
+                if(response.status == 201){
+                    // reset composing form
+                    composeForm.classList.add('hidden');
+                    document.getElementById("to").value = "";
+                    document.getElementById("subject").value = "";
+                    document.getElementById("body").value = "";
+                }
+                
+            })
+            .catch(error => {
+                console.error('Error sending user email:', error);
+            });
+        });
+        // TODO(!) might need to periodically retrieve to get new email
+        function getUserEmail() {
+            // /retrieve?user=jinghaoz&type=mbox
+            fetch('/retrieve' + queryString + '&type=mbox')
+                .then(response => {
+                    alert(response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    alert(data.emails);
+                    const inboxList = document.getElementById("inbox-list");
+
+                    // Iterate through the emails in the JSON data
+                    // TODO(!) only append if not yet in the list (search by id??)
+                    data.emails.forEach(email => {
+                        const mailItem = document.createElement("div");
+                        mailItem.classList.add("inbox-item");
+                        mailItem.id = `email-${email.id}`;
+                        mailItem.textContent = `${email.sender}\n${email.subject}\n${email.date}\n`;
+                        inboxList.appendChild(mailItem);
+
+                        mailItem.addEventListener("click", function(){
+                            //alert(`You clicked on email: ${email.id}...`);
+                            fetch('/retrieve' + queryString + '&type=mail&id=' + email.id)
+                            .then(response => {
+                                alert(response.status);
+                                return response.json();
+                            })
+                            .then(data => {
+                                if(!composeForm.classList.contains('hidden'))
+                                    composeForm.classList.add('hidden');
+                                displayForm.classList.remove('hidden');
+                                document.getElementById('display-uid').value = data.id;
+                                document.getElementById("display-from").value = data.sender;
+                                document.getElementById("display-subject").value = data.subject
+                                document.getElementById("display-body").value = data.body;
+                            })
+                        })
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching user email:', error);
+                });
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            getUserEmail();
+        });
+
+    </script>
+</body>
+</html>

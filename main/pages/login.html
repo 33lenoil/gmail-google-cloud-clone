@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+</head>
+<body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;">
+    <div class="login-container" style="width: 400px; padding: 20px; background-color: #f0f0f0; border-radius: 8px; box-shadow: 0 0 10px grey;">
+        <h1 id="login-header" style="text-align: center; color: #990000">Welcome to PennCloud ;)</h1>
+        <form class="login-form" id="login-form" style="margin-top: 10px; text-align: center;">
+            <input type="text" name="username" id="username" placeholder="Username" required style="width: 90%; padding: 15px; margin-bottom: 10px;">
+            <input type="password" name="password" id="password" placeholder="Password" required style="width: 90%; padding: 15px; margin-bottom: 10px;">
+            <input type="submit" value="Login" id="login" style="width: 45%; padding: 10px; background-color: #011F5B ; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            <input type="submit" value="Register" id="register" style="width: 45%; padding: 10px; background-color: #990000 ; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        </form>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById("login-form");
+        const loginButton = document.getElementById("login");
+        const registerButton = document.getElementById("register");
+
+        loginButton.addEventListener("click", (e) => {
+            e.preventDefault();
+            const username = loginForm.username.value;
+            const password = loginForm.password.value;
+
+            const body = `username=${username}&password=${password}`;
+
+            fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain'
+                },
+                body: body,
+            })
+            .then(response => { 
+                if (response.status !== 401 && response.status !== 404 && response.status !== 200) {
+                    throw new Error('Server Error');
+                }
+                return response.text().then(text => ({ status: response.status, text: text }));
+            })
+            .then(data => {
+                alert(data.text);
+                if(data.status === 200){
+                    window.location.href = `/home?user=${username}`;
+                }
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+            });
+        })
+
+        registerButton.addEventListener("click", (e) => {
+            e.preventDefault();
+            const username = loginForm.username.value;
+            const password = loginForm.password.value;
+
+            const body = `username=${username}&password=${password}`;
+
+            fetch('/send?type=user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain'
+                },
+                body: body,
+            })
+            .then(response => { 
+                if (response.status !== 400 && response.status !== 201) {
+                    throw new Error('Server Error');
+                }
+                return response.text().then(text => ({ status: response.status, text: text }));
+            })
+            .then(data => {
+                alert(data.text);
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+            });
+        })
+    </script>
+</body>
+</html>

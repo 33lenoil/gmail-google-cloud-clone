@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            text-align: center;
+            height: 100vh;
+        }
+
+        .module-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .module-title {
+            flex: 1 1 0px;
+            width: 100vh;
+            min-height: 50px;
+            display: flex;
+            margin: 10px;
+            padding: 10px;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            cursor: pointer;
+            border-radius: 10px;
+            color: white;
+        }
+        .node-list {
+            color: black;
+        }
+        .node-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .node-item.success {
+            background-color: #d7f0d3;
+        }
+        .node-item.error {
+            background-color: #f8d7da;
+        }
+
+        .frontend { background-color: #061f53; }
+        .frontend:hover { background-color: #5e7cbe; }
+        .backend { background-color: #9d1010; }
+        .backend:hover { background-color: #e76262; }
+        .kvstore { background-color: #373236; }
+        .kvstore:hover { background-color: #80747e; }
+    </style>
+</head>
+<body>
+    <div class="module-container">
+        <div class="frontend-module">
+            <div class="module-title frontend">
+                Frontend Nodes
+            </div>
+            <div>
+                <ul class="node-list" id="frontend-node-list">
+                    <li class="node-item success" id="127.0.0.1:8001">Node 1: Online --- Load: 0</li>
+                    <li class="node-item success" id="127.0.0.1:8002">Node 2: Online --- Load: 0</li>
+                    <li class="node-item success" id="127.0.0.1:8003">Node 3: Online --- Load: 0</li>
+
+                </ul>
+            </div>
+        </div>
+        <div class="backend-module">
+            <div class="module-title backend">
+                Backend Nodes
+            </div>
+            <ul class="node-list" id="backend-node-list">
+            </ul>
+        </div>
+        
+        <!-- <div class="kvstore-module">
+            <div class="module-title kvstore">
+                KVStore Data
+            </div>
+        </div> -->
+
+    </div>
+    
+
+    <script>
+        const queryString = window.location.search;
+        
+        function changeStatus(button) {
+
+            const nodeItem = button.parentNode;
+            const nodeIP = nodeItem.id;
+            // flip the status
+            const status = nodeItem.classList.contains('success') ? 'error' : 'success';
+            nodeItem.classList.remove('success', 'error');
+            nodeItem.classList.add(status);
+            button.textContent = status === 'success' ? 'SHUTDOWN' : 'RESTART';
+            if(status === 'error'){
+                nodeItem.innerHTML = nodeItem.innerHTML.replace('Online', 'Offline');
+                // send SHUTDOWN request to httpserver
+                fetch('/admin', {
+                    method: 'SHUTDOWN',
+                    headers: {
+                        'Content-Type': 'text/plain',
+                    },
+                    body: nodeIP,
+                })
+                .then(response => {
+                    alert(response.status);
+                    return response.text();
+                })
+                .then(text => {
+                    alert(text);
+                })
+                
+            }else{
+                nodeItem.innerHTML = nodeItem.innerHTML.replace('Offline', 'Online');
+                // send RESTART request to httpserver
+                fetch('/admin', {
+                    method: 'RESTART',
+                    headers: {
+                        'Content-Type': 'text/plain',
+                    },
+                    body: nodeIP,
+                })
+                .then(response => {
+                    alert(response.status);
+                    return response.text();
+                })
+                .then(text => {
+                    alert(text);
+                })
+            }
+        }
+
+        // periodically ask each node their current load
+        const frontendIPs = ["127.0.0.1:8001", "127.0.0.1:8002", "127.0.0.1:8003"];
+        // Function to refresh the page
+        function pollFrontendNodes() {
+            frontendIPs.forEach(IP => {
+                fetch(`http://${IP}/admin?type=load`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'text/plain',
+                    },
+                })
+                .then(response => {
+                    return response.text();
+                })
+                .then(data => {
+                    const element = document.getElementById(IP);
+                    if (element) {
+                        const lastColon = element.textContent.lastIndexOf(':');
+                        const prevMsg = element.textContent.substring(0, lastColon + 1);
+                        element.textContent = prevMsg + " " + data;
+                    } else {
+                        console.error(`Element with id ${testIP} not found.`);
+                    }
+                })
+                .catch(error => {
+                    console.error('There was a problem with the fetch operation:', error);
+                });
+            });
+        }
+
+        // Set the interval to poll fronend load every 5 seconds (5000 milliseconds)
+        setInterval(pollFrontendNodes, 5000);
+
+        const backendIPs = ["127.0.0.1:10001", "127.0.0.1:10002", "127.0.0.1:10003","127.0.0.1:10004", "127.0.0.1:10005", "127.0.0.1:10006"];
+
+        function pollBackendWorkers(){
+            fetch(`/admin`, {
+                method: 'GETINFO',
+                headers: {
+                    'Content-Type': 'text/plain',
+                },
+                body: "",
+            })
+            .then(response => {
+                return response.text();
+            })
+            .then(data => {
+                //alert(data);
+                console.log(data)
+                var deadWorkers = backendIPs;
+                const workerList = data.split("\n");
+                //console.log(workerList)
+                const backendNodeList = document.getElementById('backend-node-list');
+                backendNodeList.innerHTML = "";
+                //console.log("deadworkers BEFORE:",deadWorkers);
+                for(i in workerList){
+                    if(workerList[i].length <= 0) continue;
+                    const andPos = workerList[i].lastIndexOf('&');
+                    const ip = workerList[i].substring(3, andPos);
+                    //console.log(ip)
+                    const status = workerList[i].substring(andPos+1+7);
+                    //console.log(status)
+                    // Create a new list item element
+                    const listItem = document.createElement('li');
+
+                    // Set class attribute
+                    if(status == "Active"){
+                        listItem.className = 'node-item success';
+                        listItem.innerHTML = `${ip}: Online <button onclick="changeStatus(this)">SHUTDOWN</button>`;
+                    }else{
+                        listItem.className = 'node-item error';
+                        listItem.innerHTML = `${ip}: Recovering...`;
+                    }
+
+                    // Set id attribute
+                    listItem.id = ip;
+                    // Append the list item to a parent element (e.g., ul or ol)
+                    // For example, assuming you have a parent element with id 'nodeList'
+                    
+                    backendNodeList.appendChild(listItem);
+                    deadWorkers = deadWorkers.filter(i => i.includes(ip)==false);
+                }
+                //console.log("deadworkers AFTER:",deadWorkers);
+                for(i in deadWorkers){
+                    const ip = deadWorkers[i];
+                    const listItem = document.createElement('li');
+                    listItem.id = ip;
+                    listItem.className = 'node-item error';
+                    listItem.innerHTML = `${ip}: Offline <button onclick="changeStatus(this)">RECOVERY</button>`;
+                    backendNodeList.appendChild(listItem);
+                }
+
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+            });
+        }
+
+        setInterval(pollBackendWorkers, 5000);
+
+    </script>
+</body>
+</html>
