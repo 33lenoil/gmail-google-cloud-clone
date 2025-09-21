@@ -43,6 +43,5 @@ Both apps share a distributed storage core and a minimal, fast front end. This i
 - **Storage:** Distributed KV store (+ write-ahead log & checkpoints)
 - **Protocols:** SMTP (send), POP-style retrieval (UIDL/RETR/DELE)
 - **Frontend:** HTML, CSS, JavaScript (no heavy frameworks)
-- **Deployment:** Docker / VM / reverse proxy (e.g., Nginx)
 
 ---
